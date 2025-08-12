@@ -1,0 +1,74 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  auditLogs AuditLog[]
+}
+
+model Area {
+  id        String    @id @default(cuid())
+  name      String
+  owner     String? // Nome ou ID do responsável pela área
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  processes Process[]
+}
+
+model Process {
+  id          String     @id @default(cuid())
+  name        String
+  description String?    @db.Text
+  owner       String? // Nome ou ID do responsável pelo processo
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  areaId      String
+  area        Area       @relation(fields: [areaId], references: [id], onDelete: Cascade)
+
+  parentId    String?
+  parent      Process?   @relation("ProcessHierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children    Process[]  @relation("ProcessHierarchy")
+
+  documents   Document[]
+
+  // Para o React Flow
+  positionX   Float? @default(0)
+  positionY   Float? @default(0)
+}
+
+model Document {
+  id        String   @id @default(cuid())
+  name      String
+  url       String
+  type      String // ex: 'pdf', 'docx', 'link'
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  processId String
+  process   Process  @relation(fields: [processId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String   // ex: 'CREATE_PROCESS', 'DELETE_AREA'
+  details   Json
+  createdAt DateTime @default(now())
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+}
