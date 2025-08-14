@@ -43,6 +43,7 @@ model Process {
   parentId    String?
   parent      Process?   @relation("ProcessHierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   children    Process[]  @relation("ProcessHierarchy")
+  type        String?
 
   documents   Document[]
 

@@ -22,10 +22,11 @@ interface Process {
   positionY?: number | null;
   color?: string | null;
   systemsAndTools?: string | null; 
+  type?: string | null;
 }
 
 // Tipos para os payloads das ações
-type CreateProcessPayload = Omit<Process, 'id'> & { areaId: string };
+export type CreateProcessPayload = Omit<Process, 'id'> & { areaId: string };
 export type UpdateProcessPayload = Partial<Omit<Process, 'areaId' | 'parentId'>> & { id: string };
 
 interface ProcessesState {

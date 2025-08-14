@@ -1,5 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
-// ✅ CORREÇÃO CRÍTICA: O pacote correto é 'react-redux'
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import ReactFlow, {
   Background, Controls, MiniMap,
@@ -8,12 +7,13 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import { 
   Box, Typography, Container, CircularProgress, Alert, Menu, MenuItem, 
-  Modal, TextField, Button, Drawer, IconButton 
+  TextField, Button, Drawer, IconButton, FormControl, InputLabel, Select, type SelectChangeEvent
 } from '@mui/material';
-import CloseIcon from '@mui/icons-material/Close'; 
+import CloseIcon from '@mui/icons-material/Close';
 import { 
   fetchProcessesByArea, createProcess, updateProcess, deleteProcess,
-  updateNodePosition, handleNodesChange, handleEdgesChange, handleConnect, type UpdateProcessPayload, type CreateProcessPayload
+  updateNodePosition, handleNodesChange, handleEdgesChange, handleConnect, 
+  type UpdateProcessPayload, type CreateProcessPayload
 } from '../features/processes/processesSlice';
 import type { AppDispatch, RootState } from '../app/store';
 import api from '../api/axios';
@@ -21,10 +21,10 @@ import CustomProcessNode from '../components/CustomProcessNode';
 
 const pastelColors = ['#cfe2f3', '#d9ead3', '#fff2cc', '#fce5cd', '#f4cccc', '#d0e0e3'];
 
-// ✅ OTIMIZAÇÃO: Movido para fora do componente para evitar recriações
+// Otimização: Movido para fora para evitar recriações a cada renderização
 const nodeTypes = { custom: CustomProcessNode };
 
-// ✅ INTERFACE UNIFICADA: Para os dados do formulário da gaveta
+// Interface para os dados do nosso formulário unificado
 interface ProcessFormData {
   id?: string;
   name: string;
@@ -33,7 +33,12 @@ interface ProcessFormData {
   systemsAndTools: string;
   color: string;
   parentId?: string | null;
+  type: string;
 }
+
+const modalStyle = { /* Estilo do Drawer/Modal, pode ser usado no Drawer */
+  width: 400, p: 3
+};
 
 const ProcessGraphPage: React.FC<{ areaId: string }> = ({ areaId }) => {
   const dispatch: AppDispatch = useDispatch();
@@ -41,9 +46,22 @@ const ProcessGraphPage: React.FC<{ areaId: string }> = ({ areaId }) => {
   
   const [menu, setMenu] = useState<{ mouseX: number; mouseY: number; node: Node | null } | null>(null);
   
-  // ✅ ESTADO UNIFICADO: Controla a gaveta e os dados do formulário
+  // Estado Unificado: Controla a gaveta e os dados do formulário
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [formData, setFormData] = useState<Partial<ProcessFormData>>({});
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Lógica de filtro com useMemo para performance
+  const filteredNodes = useMemo(() => {
+    if (!searchTerm.trim()) {
+      return nodes.map(node => ({ ...node, style: { opacity: 1 } }));
+    }
+    const lowerCaseSearch = searchTerm.toLowerCase();
+    return nodes.map(node => {
+      const isMatch = node.data.label.toLowerCase().includes(lowerCaseSearch);
+      return { ...node, style: { opacity: isMatch ? 1 : 0.3, transition: 'opacity 0.2s' } };
+    });
+  }, [nodes, searchTerm]);
 
   useEffect(() => {
     if (areaId && status === 'idle') {
@@ -60,22 +78,17 @@ const ProcessGraphPage: React.FC<{ areaId: string }> = ({ areaId }) => {
     api.patch(`/processes/${node.id}/position`, { positionX: node.position.x, positionY: node.position.y });
   }, [dispatch]);
 
-  // ✅ LÓGICA UNIFICADA PARA ABRIR A GAVETA
-  const openDrawer = (mode: 'create' | 'edit', initialData: Partial<ProcessFormData> = {}) => {
+  // Função unificada para abrir a gaveta
+  const openDrawer = (initialData: Partial<ProcessFormData> = {}) => {
     setFormData({
-      name: '',
-      owner: '',
-      description: '',
-      systemsAndTools: '',
-      color: pastelColors[0],
+      name: '', owner: '', description: '', systemsAndTools: '', type: 'manual', color: pastelColors[0],
       ...initialData,
     });
     setIsDrawerOpen(true);
   };
 
   const handleNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
-    // Abre a gaveta em modo de edição ao clicar
-    openDrawer('edit', node.data.processData);
+    openDrawer(node.data.processData);
   }, []);
 
   const handleNodeContextMenu = useCallback((event: React.MouseEvent, node: Node) => {
@@ -90,35 +103,39 @@ const ProcessGraphPage: React.FC<{ areaId: string }> = ({ areaId }) => {
       const hasChildren = edges.some(edge => edge.source === menu.node!.id);
       if (hasChildren) {
         alert('Não é possível deletar um processo que possui subprocessos.');
-        handleCloseMenu();
-        return;
-      }
-      if (window.confirm(`Tem certeza que deseja deletar o processo "${menu.node.data.label}"?`)) {
+      } else if (window.confirm(`Tem certeza que deseja deletar o processo "${menu.node.data.label}"?`)) {
         dispatch(deleteProcess(menu.node.id));
       }
     }
     handleCloseMenu();
   };
 
-  // ✅ LÓGICA UNIFICADA PARA SALVAR (CRIAR OU EDITAR)
   const handleFormSubmit = async () => {
-    // ✅ Verificação de nome antes de qualquer outra coisa
-    if (!formData.name || formData.name.trim() === '') {
-      alert('O nome do processo é obrigatório.');
-      return; // Impede o envio do formulário se o nome estiver vazio
-    }
+  if (!formData.name || formData.name.trim() === '') {
+    alert('O nome do processo é obrigatório.');
+    return;
+  }
 
-    if (formData.id) { // Editando
-      await dispatch(updateProcess(formData as UpdateProcessPayload));
-    } else { // Criando
-      // Agora é seguro, pois já verificamos que 'name' existe.
-      // Usamos a asserção 'as' para confirmar o tipo para o TypeScript.
-      await dispatch(createProcess(formData as CreateProcessPayload));
-    }
-    setIsDrawerOpen(false);
+  if (formData.id) { 
+    await dispatch(updateProcess(formData as UpdateProcessPayload));
+  } else { 
+    // Prepara o payload para o console.log
+    const payloadParaCriar = { ...formData, areaId }; // Removido parentId para simplificar o log
+    
+    // ✅ LOG DE DEPURAÇÃO
+    console.log("DADOS ENVIADOS PARA A API:", payloadParaCriar);
+
+    await dispatch(createProcess(payloadParaCriar as CreateProcessPayload));
+  }
+  setIsDrawerOpen(false);
+};
+
+  const handleFormChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = event.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleFormChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSelectChange = (event: SelectChangeEvent<string>) => {
     const { name, value } = event.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
@@ -132,11 +149,15 @@ const ProcessGraphPage: React.FC<{ areaId: string }> = ({ areaId }) => {
         <Container sx={{ mt: 4, mb: 4, flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <Typography variant="h4" gutterBottom>Gestão de Processos</Typography>
-            <Button variant="contained" onClick={() => openDrawer('create')}>Adicionar Processo Raiz</Button>
+            <Button variant="contained" onClick={() => openDrawer()}>Adicionar Processo Raiz</Button>
           </Box>
-          <Box sx={{ flexGrow: 1, border: '1px solid #ddd' }}>
+          <TextField
+            label="Buscar Processo" variant="outlined" fullWidth margin="normal"
+            value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          <Box sx={{ flexGrow: 1, border: '1px solid #ddd', position: 'relative' }}>
             <ReactFlow
-              nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
+              nodes={filteredNodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
               onConnect={onConnect} onNodeDragStop={onNodeDragStop} onNodeContextMenu={handleNodeContextMenu}
               nodeTypes={nodeTypes} fitView onNodeClick={handleNodeClick}
             >
@@ -149,16 +170,25 @@ const ProcessGraphPage: React.FC<{ areaId: string }> = ({ areaId }) => {
       </Box>
 
       <Drawer anchor="right" open={isDrawerOpen} onClose={() => setIsDrawerOpen(false)}>
-        <Box sx={{ width: 400, p: 3 }} role="presentation">
+        <Box sx={modalStyle} role="presentation">
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Typography variant="h5">{formData.id ? 'Detalhes do Processo' : 'Novo Processo'}</Typography>
             <IconButton onClick={() => setIsDrawerOpen(false)}><CloseIcon /></IconButton>
           </Box>
-          <TextField name="name" label="Nome do Processo" value={formData.name || ''} onChange={handleFormChange} fullWidth margin="normal" variant="outlined" />
-          <TextField name="owner" label="Responsável" value={formData.owner || ''} onChange={handleFormChange} fullWidth margin="normal" variant="outlined" />
-          <TextField name="description" label="Descrição / Detalhes" value={formData.description || ''} onChange={handleFormChange} fullWidth margin="normal" variant="outlined" multiline rows={4} />
-          <TextField name="systemsAndTools" label="Sistemas e Ferramentas" value={formData.systemsAndTools || ''} onChange={handleFormChange} fullWidth margin="normal" variant="outlined" multiline rows={2} />
-          
+          <TextField name="name" label="Nome do Processo" value={formData.name || ''} onChange={handleFormChange} fullWidth margin="normal" />
+          <TextField name="owner" label="Responsável" value={formData.owner || ''} onChange={handleFormChange} fullWidth margin="normal" />
+          <TextField name="description" label="Descrição" value={formData.description || ''} onChange={handleFormChange} fullWidth margin="normal" multiline rows={4} />
+          <TextField name="systemsAndTools" label="Sistemas e Ferramentas" value={formData.systemsAndTools || ''} onChange={handleFormChange} fullWidth margin="normal" multiline rows={2} />
+          <FormControl fullWidth margin="normal">
+            <InputLabel id="process-type-label">Tipo de Processo</InputLabel>
+            <Select
+              labelId="process-type-label" name="type" value={formData.type || 'manual'}
+              label="Tipo de Processo" onChange={handleSelectChange}
+            >
+              <MenuItem value="manual">Manual</MenuItem>
+              <MenuItem value="system">Sistêmico</MenuItem>
+            </Select>
+          </FormControl>
           <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>Cor do Processo</Typography>
           <Box sx={{ display: 'flex', gap: 1 }}>
             {pastelColors.map(color => (
@@ -171,23 +201,16 @@ const ProcessGraphPage: React.FC<{ areaId: string }> = ({ areaId }) => {
               />
             ))}
           </Box>
-          <Button onClick={handleFormSubmit} variant="contained" sx={{ mt: 3 }}>Salvar Alterações</Button>
+          <Button onClick={handleFormSubmit} variant="contained" sx={{ mt: 3 }}>Salvar</Button>
         </Box>
       </Drawer>
       
       <Menu open={menu !== null} onClose={handleCloseMenu} anchorReference="anchorPosition" anchorPosition={menu ? { top: menu.mouseY, left: menu.mouseX } : undefined}>
         <MenuItem disabled>Ações para: {menu?.node?.data.label}</MenuItem>
-        <MenuItem onClick={() => {
-          openDrawer('create', { parentId: menu?.node?.id });
-          handleCloseMenu();
-        }}>Adicionar Subprocesso</MenuItem>
-        <MenuItem onClick={() => {
-          openDrawer('edit', menu?.node?.data.processData);
-          handleCloseMenu();
-        }}>Editar</MenuItem>
+        <MenuItem onClick={() => { openDrawer({ parentId: menu?.node?.id }); handleCloseMenu(); }}>Adicionar Subprocesso</MenuItem>
+        <MenuItem onClick={() => { openDrawer(menu?.node?.data.processData); handleCloseMenu(); }}>Editar</MenuItem>
         <MenuItem onClick={handleDeleteNode} sx={{ color: 'error.main' }}>Deletar</MenuItem>
       </Menu>
-
     </Box>
   );
 };

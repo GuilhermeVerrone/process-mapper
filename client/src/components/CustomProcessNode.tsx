@@ -1,41 +1,42 @@
-import React, { memo } from 'react';
+import { memo } from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
+import PersonIcon from '@mui/icons-material/Person';
+import ComputerIcon from '@mui/icons-material/Computer';
 
-// O tipo dos dados que nosso nó vai receber.
-// Esperamos um 'label' (o nome do processo) e uma 'color' opcional.
 type NodeData = {
   label: string;
   color?: string;
+  processData: {
+    type?: string | null;
+  };
 };
 
-// Usamos `memo` para otimizar o desempenho, evitando que os nós sejam
-// re-renderizados desnecessariamente quando outros nós mudam.
 const CustomProcessNode = memo(({ data }: NodeProps<NodeData>) => {
+  const icon = data.processData.type === 'system' 
+    ? <ComputerIcon sx={{ fontSize: 16, mr: 0.5 }} /> 
+    : <PersonIcon sx={{ fontSize: 16, mr: 0.5 }} />;
+
+     console.log("DADOS RECEBIDOS PELO NÓ:", data);
+     
   return (
     <>
-      {/* Handle são os "pontos de conexão" para as arestas (linhas). */}
-      {/* O 'target' é onde as linhas chegam (neste caso, no topo). */}
-      <Handle type="target" position={Position.Top} id="a" />
-
-      {/* Este é o corpo do nosso nó customizado. */}
-      <div
+      <Handle type="target" position={Position.Top} />
+      <div 
         style={{
-          backgroundColor: data.color || '#f0f0f0', // Usa a cor do processo ou uma cor cinza padrão
+          backgroundColor: data.color || '#f0f0f0',
           padding: '10px 15px',
           borderRadius: '5px',
           border: '1px solid #222',
-          textAlign: 'center',
           minWidth: '150px',
-          fontSize: '14px',
-          color: '#333'
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
         }}
       >
-        {/* Exibe o nome do processo */}
+        {icon} {/* ✅ Renderiza o ícone */}
         {data.label}
       </div>
-
-      {/* O 'source' é de onde as linhas saem (neste caso, da base). */}
-      <Handle type="source" position={Position.Bottom} id="b" />
+      <Handle type="source" position={Position.Bottom} />
     </>
   );
 });
