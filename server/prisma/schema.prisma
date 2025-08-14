@@ -49,6 +49,8 @@ model Process {
   // Para o React Flow
   positionX   Float? @default(0)
   positionY   Float? @default(0)
+  color       String?
+  systemsAndTools   String? @db.Text
 }
 
 model Document {

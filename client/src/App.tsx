@@ -1,35 +1,32 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import React from 'react';
+import { useSelector } from 'react-redux';
+import { type RootState } from './app/store';
+import LoginPage from './pages/login';
+import DashboardPage from './pages/dashboard';
+import ProcessGraphPage from './pages/processGraph';
 
 function App() {
-  const [count, setCount] = useState(0)
+  const { token } = useSelector((state: RootState) => state.auth);
 
-  return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+  if (!token) {
+    return <LoginPage />;
+  }
+  
+  const path = window.location.pathname;
+
+  // Rota para o gráfico: /graph/algum-id-de-area
+  if (path.startsWith('/graph/')) {
+    // Pega o ID da URL, removendo o '/graph/'
+    const areaId = path.substring('/graph/'.length);
+    if (areaId) {
+      // Passa o areaId como uma prop para o componente
+      return <ProcessGraphPage areaId={areaId} />;
+    }
+  }
+
+  // Se a rota não for do gráfico, mostra o dashboard
+  // (Isso também cobre a rota "/dashboard" e a rota raiz "/")
+  return <DashboardPage />;
 }
 
-export default App
+export default App;

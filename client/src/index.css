@@ -66,3 +66,22 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+/* Garante que a base da página ocupe toda a tela, sem margens */
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Roboto', 'Helvetica', 'Arial', sans-serif;
+  background-color: #f0f2f5; /* Opcional: uma cor de fundo suave para a página toda */
+}
+
+/* Transforma o container principal em um painel que centraliza seu conteúdo */
+#root {
+  display: flex;
+  flex-direction: column;
+}

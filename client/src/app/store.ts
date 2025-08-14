@@ -1,12 +1,14 @@
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from '../features/auth/authSlice';
-// Importar outros reducers aqui
+import areasReducer from '../features/areas/areasSlice';
+import processesReducer from '../features/processes/processesSlice'
+
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
-    // areas: areasReducer, (exemplo futuro)
-    // processes: processesReducer, (exemplo futuro)
+    areas: areasReducer,
+    processes: processesReducer, // ✅ ADICIONE
   },
 });
 
